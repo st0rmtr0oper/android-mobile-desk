@@ -34,14 +34,13 @@ class LoginViewModel : ViewModel() {
                 try {
                     val loginRequest = LoginRequest(login, password, fcmToken!!)
                     loginResponse = repository.login(loginRequest)
-                    //TODO need to handle error!!!
-                    Log.i("!--{{{LOGIN}}}--!",loginResponse.positionId.toString())
-                    _userRole.postValue(loginResponse.positionId)
+                    Log.i("!--{{{LOGIN}}}--!", loginResponse.toString())
+                    _userRole.postValue(loginResponse.roleId)
                 } catch (e: Exception) {
                     Log.i("!--{{{LOGIN}}}--!", e.toString())
                     _userRole.postValue(0)
 
-                    //postValue used because of anync work - live data update allowed only ion main thread
+                    //postValue used because of anync work - live data update allowed only in main thread
                     //this thing somehow helps with this ussue
                     //how - idk
                 }
@@ -49,8 +48,5 @@ class LoginViewModel : ViewModel() {
                 Log.d("!!!---[FCM token]---!!!", "FCM token is NULL")
             }
         }
-
-
-
     }
 }
