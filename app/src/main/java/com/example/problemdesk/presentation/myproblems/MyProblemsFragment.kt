@@ -1,76 +1,95 @@
-package com.example.problemdesk.presentation.myproblems
+package com.example.problemdesk.presentation.myproblems.pagersubfragments
 
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.view.isGone
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
-import androidx.viewpager2.widget.ViewPager2
-import com.example.problemdesk.databinding.FragmentMyProblemsBinding
-import com.example.problemdesk.presentation.general.PagerAdapter
-import com.example.problemdesk.presentation.myproblems.pagersubfragments.*
-import com.google.android.material.tabs.TabLayout
-import com.google.android.material.tabs.TabLayout.OnTabSelectedListener
-import com.google.android.material.tabs.TabLayoutMediator
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
+import com.example.problemdesk.data.sharedprefs.getSharedPrefsUserId
+import com.example.problemdesk.databinding.FragmentSubCancelledBinding
+import com.example.problemdesk.domain.models.Card
+import com.example.problemdesk.presentation.details.RequestorBottomSheetDialogFragment
+import com.example.problemdesk.presentation.general.CardRecyclerViewAdapter
+import com.example.problemdesk.presentation.general.getArea
+import com.example.problemdesk.presentation.general.getDate
+import com.example.problemdesk.presentation.general.getSpecialization
+import kotlinx.coroutines.launch
 
-
-//TODO do we need swipe function??
-
-class MyProblemsFragment : Fragment() {
-
-    private var _binding: FragmentMyProblemsBinding? = null
+class CancelledFragment : Fragment() {
+    private var _binding: FragmentSubCancelledBinding? = null
     private val binding get() = _binding!!
 
-    private lateinit var viewPager: ViewPager2
-    private lateinit var tabLayout: TabLayout
+    private val cancelledViewModel: CancelledViewModel by viewModels()
+
+    companion object {
+        fun newInstance() = CancelledFragment()
+    }
 
     override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
+        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
-        _binding = FragmentMyProblemsBinding.inflate(inflater, container, false)
+        _binding = FragmentSubCancelledBinding.inflate(inflater, container, false)
         val root: View = binding.root
+        showLoading()
         return root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
-        //initiating viewPager
-        viewPager = binding.myProblemsPager
-        val fragmentList = arrayListOf(
-            InWorkFragment.newInstance(),
-            CompletedFragment.newInstance(),
-            CancelledFragment.newInstance()
-        )
-        viewPager.adapter = PagerAdapter(this, fragmentList)
-
-        //initiating tabLayout
-        tabLayout = binding.myProblemsTabLayout
-        tabLayout.addOnTabSelectedListener(object : OnTabSelectedListener {
-            override fun onTabSelected(tab: TabLayout.Tab) {
-                viewPager.currentItem = tab.position
+        setUpObservers()
+        //::handleCardClick binding RV click logic with fragment
+        binding.cancelledRv.adapter = CardRecyclerViewAdapter(::handleCardClick)
+        val userId = context?.let { getSharedPrefsUserId(it) }
+        lifecycleScope.launch {
+            if (userId != null) {
+                cancelledViewModel.loadCards(userId)
             }
-            override fun onTabUnselected(tab: TabLayout.Tab) {
-            }
-            override fun onTabReselected(tab: TabLayout.Tab) {
-            }
-        })
-
-        //sync tabLayout with viewPager
-        TabLayoutMediator(tabLayout, viewPager) { tab, position ->
-            when (position) {
-                0 -> tab.text = "В работе"
-                1 -> tab.text = "Исполнены"
-                2 -> tab.text = "Отклонены"
-            }
-        }.attach()
+        }
     }
-
 
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+    }
+
+    private fun showLoading() {
+        with(binding) {
+            progressBar.isVisible = true
+            cancelledRv.isGone = true
+        }
+    }
+
+    private fun showContent() {
+        with(binding) {
+            progressBar.isGone = true
+            cancelledRv.isVisible = true
+        }
+    }
+
+    private fun setUpObservers() {
+        showContent()
+        cancelledViewModel.cards.observe(viewLifecycleOwner) { cards: List<Card> ->
+            (binding.cancelledRv.adapter as? CardRecyclerViewAdapter)?.cards = cards
+        }
+    }
+
+    private fun handleCardClick(card: Card) {
+        val id = card.requestId
+        val date = getDate(card.createdAt)
+        val spec = getSpecialization(card.requestType)
+        val area = getArea(card.areaId)
+        val desc = card.description
+        val stat = card.statusId
+        showBottomSheetDialogFragmentRequestor(id, stat, date, spec, area, desc)
+    }
+
+    private fun showBottomSheetDialogFragmentRequestor(requestId: Int, stat: Int, date:String, spec: String, area: String, desc: String) {
+        val role = "requestor"
+        val requestorBottomSheetDialogFragment = RequestorBottomSheetDialogFragment(requestId, stat, role, date, spec, area, desc)
+        requestorBottomSheetDialogFragment.show(parentFragmentManager, RequestorBottomSheetDialogFragment::class.java.simpleName)
     }
 }
